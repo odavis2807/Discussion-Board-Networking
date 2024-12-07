@@ -1,0 +1,9 @@
+/home/goop/Discussion_Board/build/Desktop_Qt_6_8_1-Debug/CMakeFiles/Discussion_Board.dir
+/home/goop/Discussion_Board/build/Desktop_Qt_6_8_1-Debug/CMakeFiles/edit_cache.dir
+/home/goop/Discussion_Board/build/Desktop_Qt_6_8_1-Debug/CMakeFiles/rebuild_cache.dir
+/home/goop/Discussion_Board/build/Desktop_Qt_6_8_1-Debug/CMakeFiles/list_install_components.dir
+/home/goop/Discussion_Board/build/Desktop_Qt_6_8_1-Debug/CMakeFiles/install.dir
+/home/goop/Discussion_Board/build/Desktop_Qt_6_8_1-Debug/CMakeFiles/install/local.dir
+/home/goop/Discussion_Board/build/Desktop_Qt_6_8_1-Debug/CMakeFiles/install/strip.dir
+/home/goop/Discussion_Board/build/Desktop_Qt_6_8_1-Debug/CMakeFiles/Discussion_Board_autogen_timestamp_deps.dir
+/home/goop/Discussion_Board/build/Desktop_Qt_6_8_1-Debug/CMakeFiles/Discussion_Board_autogen.dir
