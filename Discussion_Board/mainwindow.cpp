@@ -15,20 +15,43 @@ MainWindow::~MainWindow()
 
 void MainWindow::on_pushButton_clicked()
 {
-    QString post = ui->txtPost->text();
-    ui->txtPost->setText(NULL);
+    if (!ui->txtAuthor->isModified()) {
+        ui->txtAuthor->setText("REQUIRED");
+    }
+    if (!ui->txtTopic->isModified()) {
+        ui->txtTopic->setText("REQUIRED");
+    }
+    if (!ui->txtPost->isModified()) {
+        ui->txtPost->setText("REQUIRED");
+    }
+    if(ui->txtAuthor->isModified() && ui->txtTopic->isModified() && ui->txtPost->isModified()) {
+        std::string stdpost = "POST|" + ui->txtAuthor->text().toStdString() + "|" + ui->txtTopic->text().toStdString() + "|" + ui->txtPost->text().toStdString();
+        SendPost(stdpost);
+    }
 
-    std::string stdpost = post.toStdString();
-    SendPost(stdpost);
+
 }
 
 void MainWindow::PostReveived(std::string post) {
-    QString qpost = QString::fromStdString(post);
+    std::vector<std::string> parsedPost = parsePost(post);
+
+    QString qpost = "\nAuthor: " + QString::fromStdString(parsedPost[1]) + "\nTopic: " + QString::fromStdString(parsedPost[2]) + "\nPost:\n" + QString::fromStdString(parsedPost[3]);
     ui->listBoard->insertItem(0, qpost);
 }
 
 void MainWindow::SendPost(std::string post) {
     //yet to be implemented
     qDebug() << "Post Sent: " << QString::fromStdString(post) << "\n";
+}
+
+std::vector<std::string> MainWindow::parsePost(std::string post) {
+    std::vector<std::string> parsedPost;
+    std::stringstream ss(post);
+    std::string segment;
+
+    while (std::getline(ss, segment, '|')) {
+        parsedPost.push_back(segment);
+    }
+    return parsedPost;
 }
 
