@@ -6,115 +6,148 @@
 #include <fstream>
 #include <vector>
 #include <sstream>
-
-#define INVALID_SOCKET 0
-#define SOCKET_ERROR -1
 using namespace std;
 
-struct Post {
+struct Message {
     string author;
     string topic;
     string message;
 };
 
-// Function to parse the message and extract post details
-Post parseMessage(const string& message) {
-    Post post;
-    stringstream ss(message);
-    getline(ss, post.author, '|');
-    getline(ss, post.topic, '|');
-    getline(ss, post.message, '|');
-    return post;
-}
+vector<Message> loadLogs(const string& filename);
+string formatLogs(const vector<Message>& logs);
+void saveLog(const Message& msg, const string& filename);
+Message parseMessage(const string& rawMessage);
 
-// Function to save posts to a file
-void savePostToFile(const Post& post, const string& filename) {
-    ofstream file(filename, ios::app);
-    if (file.is_open()) {
-        file << post.author << "|" << post.topic << "|" << post.message << endl;
-        file.close();
-    } else {
-        cerr << "ERROR: Could not open file to save post." << endl;
-    }
-}
-
-// Main server function
 int main() {
+    const string filename = "logs.txt";
+    vector<Message> logs = loadLogs(filename);
+
     // Create server socket
-    int ServerSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (ServerSocket == INVALID_SOCKET) {
-        cerr << "ERROR: Failed to create ServerSocket" << endl;
+    int serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (serverSocket == -1) {
+        cerr << "ERROR: Failed to create server socket" << endl;
         return -1;
     }
 
-    // Bind the socket to an IP address and port
-    sockaddr_in SvrAddr;
-    SvrAddr.sin_family = AF_INET;
-    SvrAddr.sin_port = htons(27500);
-    SvrAddr.sin_addr.s_addr = INADDR_ANY;
+    sockaddr_in serverAddr;
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(27500);
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
 
-    if (bind(ServerSocket, (struct sockaddr)&SvrAddr, sizeof(SvrAddr)) == SOCKET_ERROR) {
-        cerr << "ERROR: Failed to bind ServerSocket" << endl;
-        close(ServerSocket);
+    if (bind(serverSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) == -1) {
+        cerr << "ERROR: Failed to bind server socket" << endl;
+        close(serverSocket);
         return -1;
     }
 
-    // Listen for incoming connections
-    if (listen(ServerSocket, 1) == SOCKET_ERROR) {
-        cerr << "ERROR: Failed to listen on ServerSocket" << endl;
-        close(ServerSocket);
+    if (listen(serverSocket, 1) == -1) {
+        cerr << "ERROR: Failed to listen on server socket" << endl;
+        close(serverSocket);
         return -1;
     }
 
-    cout << "Server is running. Waiting for connections..." << endl;
+    cout << "Server is running and waiting for connections..." << endl;
 
     while (true) {
-        // Accept a client connection
-        sockaddr_in ClientAddr;
-        socklen_t AddrLen = sizeof(ClientAddr);
-        int ClientSocket = accept(ServerSocket, (struct sockaddr)&ClientAddr, &AddrLen);
+        sockaddr_in clientAddr;
+        socklen_t addrLen = sizeof(clientAddr);
+        int clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddr, &addrLen);
 
-        if (ClientSocket == INVALID_SOCKET) {
+        if (clientSocket == -1) {
             cerr << "ERROR: Failed to accept client connection" << endl;
             continue;
         }
 
         cout << "Client connected." << endl;
 
-        // Receive message from the client
+        // Step 1: Send all previous logs to the client
+        string formattedLogs = formatLogs(logs);
+        send(clientSocket, formattedLogs.c_str(), formattedLogs.length(), 0);
+        cout << "Previous logs sent to client." << endl;
+
+        // Step 2: Receive and process multiple messages
         char buffer[1024];
-        memset(buffer, 0, sizeof(buffer));
-        int bytesRead = recv(ClientSocket, buffer, sizeof(buffer) - 1, 0);
+        while (true) {
+            memset(buffer, 0, sizeof(buffer));
+            int bytesRead = recv(clientSocket, buffer, sizeof(buffer) - 1, 0);
 
-        if (bytesRead <= 0) {
-            cerr << "ERROR: Failed to receive message from client" << endl;
-            close(ClientSocket);
-            continue;
+            if (bytesRead <= 0) {
+                cout << "Client disconnected." << endl;
+                break; // Exit the loop if the client disconnects
+            }
+
+            cout << "Received message from client: " << buffer << endl;
+
+            // Parse the message and save it to logs
+            string receivedMessage(buffer);
+            Message newMessage = parseMessage(receivedMessage);
+            logs.push_back(newMessage);
+            saveLog(newMessage, filename);
+
+            cout << "New message saved: " << newMessage.author << " | " 
+                 << newMessage.topic << " | " << newMessage.message << endl;
+
+            // Send success response
+            send(clientSocket, "1", 1, 0);
         }
 
-        string receivedMessage(buffer);
-        cout << "Received: " << receivedMessage << endl;
-
-        // Process the message
-        if (receivedMessage.find("<EOM>") != string::npos) {
-            Post post = parseMessage(receivedMessage);
-            savePostToFile(post, "posts.txt");
-            cout << "Post saved: " << post.author << " | " << post.topic << " | " << post.message << endl;
-
-            // Respond to the client
-            const char* successResponse = "1";
-            send(ClientSocket, successResponse, strlen(successResponse), 0);
-        } else {
-            const char* failureResponse = "0";
-            send(ClientSocket, failureResponse, strlen(failureResponse), 0);
-        }
-
-        // Close the client connection
-        close(ClientSocket);
-        cout << "Client disconnected." << endl;
+        close(clientSocket);
     }
 
-    // Close the server socket
-    close(ServerSocket);
+    close(serverSocket);
     return 0;
 }
+
+// Function to load logs from a file
+vector<Message> loadLogs(const string& filename) {
+    vector<Message> logs;
+    ifstream file(filename);
+    if (file.is_open()) {
+        string line;
+        while (getline(file, line)) {
+            stringstream ss(line);
+            Message msg;
+            getline(ss, msg.author, '|');
+            getline(ss, msg.topic, '|');
+            getline(ss, msg.message, '|');
+            logs.push_back(msg);
+        }
+        file.close();
+    } else {
+        cout << "No existing logs found." << endl;
+    }
+    return logs;
+}
+
+// Function to format logs for transmission to the client
+string formatLogs(const vector<Message>& logs) {
+    stringstream formattedLogs;
+    for (const auto& log : logs) {
+        formattedLogs << log.author << " | " << log.topic << " | " 
+                      << log.message << " | <EOM>\n";
+    }
+    return formattedLogs.str();
+}
+
+// Function to save a log entry to a file
+void saveLog(const Message& msg, const string& filename) {
+    ofstream file(filename, ios::app);
+    if (file.is_open()) {
+        file << msg.author << "|" << msg.topic << "|" << msg.message << endl;
+        file.close();
+    } else {
+        cerr << "ERROR: Could not open file to save log." << endl;
+    }
+}
+
+// Function to parse a raw message into a Message struct
+Message parseMessage(const string& rawMessage) {
+    Message msg;
+    stringstream ss(rawMessage);
+    getline(ss, msg.author, '|');
+    getline(ss, msg.topic, '|');
+    getline(ss, msg.message, '|');
+    return msg;
+}
+
